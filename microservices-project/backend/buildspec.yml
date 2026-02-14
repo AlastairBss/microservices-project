@@ -1,13 +1,20 @@
+version: 0.2
 
-FROM python:3.10-slim
-ENV PYTHONUNBUFFERED=1
-WORKDIR /app
-COPY requirements.txt .
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 326963733272.dkr.ecr.us-east-1.amazonaws.com
+      
+  build:
+    commands:
+      - echo Building Docker image
+      - docker build -t backend .
+      - docker tag backend:latest 326963733272.dkr.ecr.us-east-1.amazonaws.com/backend-service:latest
 
-# dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 8000
-
-#    server
-CMD ["python", "main.py"]
+  post_build:
+    commands:
+      - echo Pushing image
+      - docker push 326963733272.dkr.ecr.us-east-1.amazonaws.com/backend-service:latest
+      - echo Deploying to ECS
+      - aws ecs update-service --cluster prod-cluster --service backendrepo-task-service-bhkr8o7x --force-new-deployment
